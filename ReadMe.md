@@ -1,4 +1,4 @@
-# 📦 StockSetu — Inventory Management POC for Indian SMEs
+# Inventory Management POC for Indian SMEs
 
 A full-stack inventory management system with:
 - **MySQL** database (GST-aware, Indian business logic)
