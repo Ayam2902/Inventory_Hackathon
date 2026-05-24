@@ -1,0 +1,122 @@
+# ===========================
+#  .NET / ASP.NET Core
+# ===========================
+
+# Build output
+bin/
+obj/
+
+# Visual Studio / Rider project files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+.idea/
+
+# Publish output
+publish/
+out/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Runtime & logs
+*.log
+*.tmp
+*.temp
+launchSettings.json
+
+# Secrets / environment-specific config (keep base appsettings.json in git)
+appsettings.*.json
+!appsettings.json
+secrets.json
+*.pfx
+*.p12
+
+# ===========================
+#  React / Node.js
+# ===========================
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+.nuxt/
+.output/
+
+# Environment variable files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vite cache
+.vite/
+
+# Parcel cache
+.cache/
+.parcel-cache/
+
+# Testing
+coverage/
+
+# Storybook
+storybook-static/
+
+# Misc JS tooling
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# ===========================
+#  OS generated files
+# ===========================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# ===========================
+#  Editors
+# ===========================
+
+# VS Code (keep shared settings, ignore personal)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains
+.idea/
+*.iml
+
+# Vim / Emacs swap files
+*.swp
+*.swo
+*#
+.#*
