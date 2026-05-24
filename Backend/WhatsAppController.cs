@@ -52,35 +52,53 @@ public class WhatsAppController : ControllerBase
     }
 
     // ── Incoming message handler (POST) ──────────────────────────────────
+    // Twilio sends form-encoded data; Meta sends JSON — both handled here
     [HttpPost("webhook")]
-    public async Task<IActionResult> HandleMessage([FromBody] JsonElement body)
+    [Consumes("application/x-www-form-urlencoded", "application/json")]
+    public async Task<IActionResult> HandleMessage()
     {
         try
         {
-            // Parse message from Meta webhook payload
-            var entry = body.GetProperty("entry")[0];
-            var change = entry.GetProperty("changes")[0];
-            var value = change.GetProperty("value");
+            string from, text;
+            var provider = _config["WhatsApp:Provider"] ?? "Meta";
 
-            if (!value.TryGetProperty("messages", out var messages))
-                return Ok(); // Not a message event (e.g. status update)
+            if (provider == "Twilio")
+            {
+                // Twilio sends form-encoded body: From=whatsapp:+91xxx&Body=hello
+                from = Request.Form["From"].ToString().Replace("whatsapp:", "");
+                text = Request.Form["Body"].ToString();
+            }
+            else
+            {
+                // Meta sends JSON body
+                using var reader = new System.IO.StreamReader(Request.Body);
+                var rawBody = await reader.ReadToEndAsync();
+                var body = System.Text.Json.JsonDocument.Parse(rawBody).RootElement;
 
-            var message = messages[0];
-            var from = message.GetProperty("from").GetString()!;       // phone number
-            var text = message.GetProperty("text").GetProperty("body").GetString()!;
+                var entry = body.GetProperty("entry")[0];
+                var change = entry.GetProperty("changes")[0];
+                var value = change.GetProperty("value");
 
-            // Parse intent and respond
+                if (!value.TryGetProperty("messages", out var messages))
+                    return Ok();
+
+                var message = messages[0];
+                from = message.GetProperty("from").GetString()!;
+                text = message.GetProperty("text").GetProperty("body").GetString()!;
+            }
+
+            if (string.IsNullOrWhiteSpace(text)) return Ok();
+
             var replyText = await ProcessMessageAsync(from, text);
-
-            // Send reply via Meta WhatsApp API
             await SendWhatsAppReplyAsync(from, replyText);
 
-            return Ok();
+            // Twilio expects empty 200 TwiML response
+            return Content("<Response></Response>", "text/xml");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"WhatsApp webhook error: {ex.Message}");
-            return Ok(); // Always return 200 to Meta
+            return Content("<Response></Response>", "text/xml");
         }
     }
 
@@ -215,24 +233,52 @@ public class WhatsAppController : ControllerBase
 ❓ *Help:*
   HELP";
 
-    // ── Send reply to WhatsApp via Meta Cloud API ─────────────────────────
+    // ── Send reply — supports both Twilio and Meta ────────────────────────
     private async Task SendWhatsAppReplyAsync(string to, string message)
     {
-        var token = _config["WhatsApp:AccessToken"];
-        var phoneNumberId = _config["WhatsApp:PhoneNumberId"];
-        var url = $"https://graph.facebook.com/v19.0/{phoneNumberId}/messages";
+        var provider = _config["WhatsApp:Provider"] ?? "Meta";
 
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
-
-        var payload = new
+        if (provider == "Twilio")
         {
-            messaging_product = "whatsapp",
-            to,
-            type = "text",
-            text = new { body = message }
-        };
+            // Twilio REST API — Basic Auth with AccountSid:AuthToken
+            var accountSid  = _config["WhatsApp:AccountSid"]!;
+            var authToken   = _config["WhatsApp:AuthToken"]!;
+            var fromNumber  = _config["WhatsApp:SandboxNumber"]!;  // whatsapp:+14155238886
+            var url = $"https://api.twilio.com/2010-04-01/Accounts/{accountSid}/Messages.json";
 
-        await http.PostAsJsonAsync(url, payload);
+            using var http = new HttpClient();
+            var credentials = Convert.ToBase64String(
+                System.Text.Encoding.ASCII.GetBytes($"{accountSid}:{authToken}"));
+            http.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
+
+            var formData = new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("From", fromNumber),
+                new KeyValuePair<string, string>("To",   $"whatsapp:{to}"),
+                new KeyValuePair<string, string>("Body", message)
+            });
+
+            await http.PostAsync(url, formData);
+        }
+        else
+        {
+            // Meta Cloud API — Bearer token
+            var token         = _config["WhatsApp:AccessToken"]!;
+            var phoneNumberId = _config["WhatsApp:PhoneNumberId"]!;
+            var url = $"https://graph.facebook.com/v19.0/{phoneNumberId}/messages";
+
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+            var payload = new
+            {
+                messaging_product = "whatsapp",
+                to,
+                type = "text",
+                text = new { body = message }
+            };
+
+            await http.PostAsJsonAsync(url, payload);
+        }
     }
 }
